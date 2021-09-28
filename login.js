@@ -1,7 +1,9 @@
 
 const cheerio= require("cheerio");
 const request= require("request-promise");
-const fs= require("fs-extra");
+const fs_extra = require("fs-extra");
+const fs = require('fs');
+
 
 const puppeteer = require('puppeteer');
 const ACC = require('./acceso');
@@ -64,10 +66,8 @@ const playTest = async (url) => {
 
   // Reviews
   await page.waitForSelector('#recordGrid')
-  let contenedor  = await page.$('#recordGrid')
 
-  let subcontenedores = await contenedor.$$('div[ng-repeat="r in records track by $index"]')
-
+ 
   // console.log(subcontenedores.length)
   // console.log(subcontenedores[[1]])
 
@@ -75,24 +75,60 @@ const playTest = async (url) => {
   // let sentimiento = await subcontenedores[0].$eval('div.response-data-container div.record-sentiment-container div.sentiment-diamond', element => element.innerText)
   // console.log(sentimiento)
 
-  let reviews = []
-// 
-  for (subcontenedor of subcontenedores){
 
-    let comentario = await subcontenedor.$eval('div.response-data-container div.record-container div.response-container span', element => element.innerText)
-    let fecha = await subcontenedor.$eval('div.response-data-container div.response-fields span', element => element.innerText)
+
+  let reviews = []
+
+  let paginas = await page.$eval( 'div.pager-container input', x => x.getAttribute("max") )
   
-    review = {
-      comentario: comentario,
-      fecha: fecha
-      // sentimiento: ,
+  for( let i=1 ; i < 6; i++){
+
+    var contenedor  = await page.$('#recordGrid')
+    var subcontenedores = await contenedor.$$('div[ng-repeat="r in records track by $index"]')
+    var next_button = await page.$( 'div.pager-container button[aria-label="Next Page"]' )
+
+    for (subcontenedor of subcontenedores){
+
+      let comentario = await subcontenedor.$eval('div.response-data-container div.record-container div.response-container span', element => element.innerText)
+      let fecha = await subcontenedor.$eval('div.response-data-container div.response-fields span', element => element.innerText)
+    
+      review = {
+        comentario: comentario,
+        fecha: fecha
+        // sentimiento: ,
+      }
+  
+      reviews.push(review)
+  
+    } 
+
+    if ( (i + 1) < 6 ) {
+      await next_button.click()
+      // await page.waitForSelector('#recordGrid')
+      await page.waitForTimeout(2500)
     }
 
-    reviews.push(review)
+  }
 
-  } 
 
   console.log(reviews)
+  console.log('Cantidad de paginas totales: ' + paginas)
+  console.log('Cantidad de comentarios totales: ' + reviews.length)
+
+  const file = fs.createWriteStream('data.csv');
+  file.on('error', err => { console.log(err) });
+  allLinks.forEach( link => { file.write( `${link}\n` ) });
+  file.end();
+
+  fs.createReadStream('data.csv')
+  .pipe(csv())
+  .on('data', (row) => {
+    console.log(row);
+  })
+  .on('end', () => {
+    console.log('CSV file successfully processed');
+  });
+
 }
   
 playTest("https://ciudaddebuenosaires.co1.qualtrics.com");
